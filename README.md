@@ -14,6 +14,19 @@
 * **Effects**: canvas-confetti (目標達成時のお祝い演出用)
 * **Storage**: LocalStorage (オフライン・サーバーレス対応)
 
+## 💻 ローカル開発（VSCode）
+1. VSCode で本リポジトリを開く。
+2. ターミナルを開き、依存関係をインストールする。
+   ```bash
+   npm install
+   ```
+3. 開発サーバーを起動する。
+   ```bash
+   npm run dev
+   ```
+4. ターミナルに表示される URL（例: `http://127.0.0.1:5173/`）をブラウザで開く。
+5. 停止する場合は `Ctrl + C` を押す。
+
 ## 🚀 開発ロードマップ (Milestones)
 
 ### 🚩 Milestone 1: アプリの骨組みと1球入力画面の実装
