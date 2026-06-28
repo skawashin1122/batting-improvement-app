@@ -1,6 +1,16 @@
 import { BarChart3, NotebookPen } from 'lucide-react'
-import { useState } from 'react'
-import type { Judgment, PitchCourse, PitchRecord, PitchType, HitDirection, HitType, HitQuality } from './types/pitch'
+import { useEffect, useMemo, useState } from 'react'
+import type {
+  Judgment,
+  PitchCourse,
+  PitchRecord,
+  PitchType,
+  HitDirection,
+  HitType,
+  HitQuality,
+  PlateAppearanceResult,
+} from './types/pitch'
+import { calculateBattingStats } from './utils/stats'
 
 type TabKey = 'record' | 'analytics'
 
@@ -54,12 +64,112 @@ const judgmentOptions: Array<{ value: Judgment; label: string }> = [
   { value: 'in-play', label: 'インプレー' },
 ]
 
+const plateAppearanceResultOptions: Array<{ value: PlateAppearanceResult; label: string }> = [
+  { value: 'single', label: '単打' },
+  { value: 'double', label: '二塁打' },
+  { value: 'triple', label: '三塁打' },
+  { value: 'home-run', label: '本塁打' },
+  { value: 'walk', label: '四球' },
+  { value: 'strikeout', label: '三振' },
+  { value: 'out', label: 'アウト' },
+]
+
+const STORAGE_KEY = 'at-bat-analytica-pitch-records-v1'
+
+const pitchTypeValues: PitchType[] = ['straight', 'slider', 'curve', 'fork', 'changeup']
+const pitchCourseValues: PitchCourse[] = [
+  'zone-top-left',
+  'zone-top-center',
+  'zone-top-right',
+  'zone-middle-left',
+  'zone-center',
+  'zone-middle-right',
+  'zone-bottom-left',
+  'zone-bottom-center',
+  'zone-bottom-right',
+  'ball-up',
+  'ball-down',
+  'ball-left',
+  'ball-right',
+  'ball-up-left',
+  'ball-up-right',
+  'ball-down-left',
+  'ball-down-right',
+]
+const judgmentValues: Judgment[] = ['ball', 'called-strike', 'swinging-strike', 'foul', 'in-play']
+const hitDirectionValues: HitDirection[] = ['left', 'center', 'right']
+const hitTypeValues: HitType[] = ['ground-ball', 'line-drive', 'fly-ball']
+const hitQualityValues: HitQuality[] = ['clean', 'normal', 'jammed']
+const plateAppearanceResultValues: PlateAppearanceResult[] = ['single', 'double', 'triple', 'home-run', 'walk', 'strikeout', 'out']
+
+function isPitchRecordArray(value: unknown): value is PitchRecord[] {
+  if (!Array.isArray(value)) {
+    return false
+  }
+
+  return value.every((item) => {
+    if (typeof item !== 'object' || item === null) {
+      return false
+    }
+
+    const record = item as Record<string, unknown>
+    if (
+      typeof record.id !== 'string' ||
+      typeof record.recordedAt !== 'string' ||
+      !pitchTypeValues.includes(record.pitchType as PitchType) ||
+      !pitchCourseValues.includes(record.pitchCourse as PitchCourse) ||
+      !judgmentValues.includes(record.judgment as Judgment)
+    ) {
+      return false
+    }
+
+    if (record.hitDirection !== undefined && !hitDirectionValues.includes(record.hitDirection as HitDirection)) {
+      return false
+    }
+    if (record.hitType !== undefined && !hitTypeValues.includes(record.hitType as HitType)) {
+      return false
+    }
+    if (record.hitQuality !== undefined && !hitQualityValues.includes(record.hitQuality as HitQuality)) {
+      return false
+    }
+    if (
+      record.plateAppearanceResult !== undefined &&
+      !plateAppearanceResultValues.includes(record.plateAppearanceResult as PlateAppearanceResult)
+    ) {
+      return false
+    }
+
+    return true
+  })
+}
+
+function persistPitchRecords(records: PitchRecord[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records))
+  } catch (error) {
+    if (error instanceof DOMException) {
+      alert('保存に失敗しました。ブラウザの保存容量や設定を確認してください。')
+      return
+    }
+    throw error
+  }
+}
+
+function formatDecimal(value: number): string {
+  return value.toFixed(3)
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('record')
   const [pitchRecords, setPitchRecords] = useState<PitchRecord[]>([])
   const [selectedCourse, setSelectedCourse] = useState<PitchCourse | null>(null)
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null)
   const [selectedJudgment, setSelectedJudgment] = useState<Judgment | null>(null)
+  const [selectedPlateAppearanceResult, setSelectedPlateAppearanceResult] = useState<PlateAppearanceResult | null>(null)
   const [selectedHitDirection, setSelectedHitDirection] = useState<HitDirection | null>(null)
   const [selectedHitType, setSelectedHitType] = useState<HitType | null>(null)
   const [selectedHitQuality, setSelectedHitQuality] = useState<HitQuality | null>(null)
@@ -82,6 +192,32 @@ function App() {
     { value: 'jammed', label: '詰まり/泳ぎ' },
   ]
 
+  useEffect(() => {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) {
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (!isPitchRecordArray(parsed)) {
+        alert('保存データ形式が不正なため、保存データを初期化しました。')
+        localStorage.removeItem(STORAGE_KEY)
+        return
+      }
+      setPitchRecords(parsed)
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        alert('保存データの読み込みに失敗したため、保存データを初期化しました。')
+        localStorage.removeItem(STORAGE_KEY)
+        return
+      }
+      throw error
+    }
+  }, [])
+
+  const battingStats = useMemo(() => calculateBattingStats(pitchRecords), [pitchRecords])
+
   const handleRecordPitch = () => {
     if (!selectedCourse || !selectedPitchType || !selectedJudgment) {
       alert('コース、球種、判定をすべて選択してください。')
@@ -94,6 +230,7 @@ function App() {
       pitchType: selectedPitchType,
       pitchCourse: selectedCourse,
       judgment: selectedJudgment,
+      plateAppearanceResult: selectedPlateAppearanceResult || undefined,
     }
 
     if (selectedJudgment === 'in-play') {
@@ -102,11 +239,16 @@ function App() {
       newRecord.hitQuality = selectedHitQuality || undefined
     }
 
-    setPitchRecords([...pitchRecords, newRecord])
+    setPitchRecords((previous) => {
+      const next = [...previous, newRecord]
+      persistPitchRecords(next)
+      return next
+    })
 
     setSelectedCourse(null)
     setSelectedPitchType(null)
     setSelectedJudgment(null)
+    setSelectedPlateAppearanceResult(null)
     setSelectedHitDirection(null)
     setSelectedHitType(null)
     setSelectedHitQuality(null)
@@ -268,6 +410,30 @@ function App() {
           })}
         </div>
       </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-900">打席結果（任意）</h3>
+        <p className="mt-1 text-xs text-slate-500">AVG/OBP/SLG/OPS・BB/Kの計算対象になります。</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {plateAppearanceResultOptions.map((option) => {
+            const isSelected = selectedPlateAppearanceResult === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setSelectedPlateAppearanceResult(option.value)}
+                className={`rounded-xl border px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
+                  isSelected
+                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                }`}
+                aria-pressed={isSelected}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
       {selectedJudgment === 'in-play' && <InPlayForm />}
       <button
         type="button"
@@ -292,6 +458,10 @@ function App() {
             <dt className="font-medium">選択中判定</dt>
             <dd>{judgmentOptions.find((option) => option.value === selectedJudgment)?.label ?? '未選択'}</dd>
           </div>
+          <div className="flex items-center justify-between gap-2">
+            <dt className="font-medium">選択中打席結果</dt>
+            <dd>{plateAppearanceResultOptions.find((option) => option.value === selectedPlateAppearanceResult)?.label ?? '未選択'}</dd>
+          </div>
         </dl>
       </div>
     </section>
@@ -301,13 +471,52 @@ function App() {
     <section className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">打撃分析 (Analytics)</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          入力データが蓄積されると、ここに打率やゾーン別傾向などを表示します。
-        </p>
+        <p className="mt-2 text-sm text-slate-600">記録データから主要スタッツを自動計算して表示します。</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm text-slate-700">分析対象データはまだありません。</p>
-      </div>
+      {pitchRecords.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-700">分析対象データはまだありません。まずは「1球入力」から記録してください。</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">打率 (AVG)</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.avg)}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">出塁率 (OBP)</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.obp)}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">長打率 (SLG)</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.slg)}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">OPS</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.ops)}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">O-Swing%</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatPercent(battingStats.oSwingRate)}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">BB/K</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {battingStats.bbPerK === null ? '-' : formatDecimal(battingStats.bbPerK)}
+            </p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">打数 (AB)</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{battingStats.atBats}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">安打 / 四球 / 三振</p>
+            <p className="mt-2 text-xl font-bold text-slate-900">
+              {battingStats.hits} / {battingStats.walks} / {battingStats.strikeouts}
+            </p>
+          </article>
+        </div>
+      )}
     </section>
   )
 
