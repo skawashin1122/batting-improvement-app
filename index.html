@@ -3,11 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>temp-vite-app</title>
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="感覚をデータに変える野球打撃分析アプリ。コース別成績を可視化し、改善点を発見できます。" />
+    <meta name="og:title" content="At-Bat Analytica" />
+    <meta name="og:description" content="感覚をデータに変える野球打撃分析アプリ" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="At-Bat Analytica" />
+    <title>At-Bat Analytica</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+          .catch(error => console.error('Service Worker registration failed:', error))
+      }
+    </script>
   </body>
 </html>

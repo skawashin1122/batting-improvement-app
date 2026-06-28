@@ -1,4 +1,4 @@
-import { BarChart3, NotebookPen } from 'lucide-react'
+import { BarChart3, NotebookPen, Trash2 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
@@ -211,6 +211,7 @@ function App() {
   const [selectedHitType, setSelectedHitType] = useState<HitType | null>(null)
   const [selectedHitQuality, setSelectedHitQuality] = useState<HitQuality | null>(null)
   const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetricKey>('avg')
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false)
   const hasTriggeredHotStreakConfetti = useRef(false)
 
   const hitDirectionOptions: Array<{ value: HitDirection; label: string }> = [
@@ -306,6 +307,12 @@ function App() {
     setSelectedHitDirection(null)
     setSelectedHitType(null)
     setSelectedHitQuality(null)
+  }
+
+  const handleResetData = () => {
+    setPitchRecords([])
+    localStorage.removeItem(STORAGE_KEY)
+    setIsResetDialogOpen(false)
   }
 
   const InPlayForm = () => (
@@ -626,6 +633,50 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
+       <div className="flex items-center justify-between gap-3">
+         <div>
+           <h3 className="text-sm font-semibold text-rose-900">データ初期化</h3>
+           <p className="mt-1 text-xs text-rose-700">保存されたすべての投球記録をリセットします。</p>
+         </div>
+         <button
+           type="button"
+           onClick={() => setIsResetDialogOpen(true)}
+           className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1"
+         >
+           <Trash2 size={16} />
+           リセット
+         </button>
+       </div>
+      </div>
+
+      {isResetDialogOpen && (
+       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+         <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
+           <h3 className="text-lg font-bold text-slate-900">データを初期化しますか？</h3>
+           <p className="mt-2 text-sm text-slate-700">
+             保存されたすべての投球記録が削除されます。この操作は取り消せません。
+           </p>
+           <div className="mt-6 flex gap-3">
+             <button
+               type="button"
+               onClick={() => setIsResetDialogOpen(false)}
+               className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1"
+             >
+               キャンセル
+             </button>
+             <button
+               type="button"
+               onClick={handleResetData}
+               className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1"
+             >
+               削除する
+             </button>
+           </div>
+         </div>
+       </div>
       )}
     </section>
   )
