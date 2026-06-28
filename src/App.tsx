@@ -1,6 +1,6 @@
 import { BarChart3, NotebookPen } from 'lucide-react'
 import { useState } from 'react'
-import type { Judgment, PitchCourse, PitchRecord, PitchType } from './types/pitch'
+import type { Judgment, PitchCourse, PitchRecord, PitchType, HitDirection, HitType, HitQuality } from './types/pitch'
 
 type TabKey = 'record' | 'analytics'
 
@@ -56,10 +56,131 @@ const judgmentOptions: Array<{ value: Judgment; label: string }> = [
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('record')
-  const [pitchRecords] = useState<PitchRecord[]>([])
+  const [pitchRecords, setPitchRecords] = useState<PitchRecord[]>([])
   const [selectedCourse, setSelectedCourse] = useState<PitchCourse | null>(null)
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null)
   const [selectedJudgment, setSelectedJudgment] = useState<Judgment | null>(null)
+  const [selectedHitDirection, setSelectedHitDirection] = useState<HitDirection | null>(null)
+  const [selectedHitType, setSelectedHitType] = useState<HitType | null>(null)
+  const [selectedHitQuality, setSelectedHitQuality] = useState<HitQuality | null>(null)
+
+  const hitDirectionOptions: Array<{ value: HitDirection; label: string }> = [
+    { value: 'left', label: 'レフト' },
+    { value: 'center', label: 'センター' },
+    { value: 'right', label: 'ライト' },
+  ]
+
+  const hitTypeOptions: Array<{ value: HitType; label: string }> = [
+    { value: 'ground-ball', label: 'ゴロ' },
+    { value: 'line-drive', label: 'ライナー' },
+    { value: 'fly-ball', label: 'フライ' },
+  ]
+
+  const hitQualityOptions: Array<{ value: HitQuality; label: string }> = [
+    { value: 'clean', label: '芯/クリーン' },
+    { value: 'normal', label: '普通' },
+    { value: 'jammed', label: '詰まり/泳ぎ' },
+  ]
+
+  const handleRecordPitch = () => {
+    if (!selectedCourse || !selectedPitchType || !selectedJudgment) {
+      alert('コース、球種、判定をすべて選択してください。')
+      return
+    }
+
+    const newRecord: PitchRecord = {
+      id: `${Date.now()}`,
+      recordedAt: new Date().toISOString(),
+      pitchType: selectedPitchType,
+      pitchCourse: selectedCourse,
+      judgment: selectedJudgment,
+    }
+
+    if (selectedJudgment === 'in-play') {
+      newRecord.hitDirection = selectedHitDirection || undefined
+      newRecord.hitType = selectedHitType || undefined
+      newRecord.hitQuality = selectedHitQuality || undefined
+    }
+
+    setPitchRecords([...pitchRecords, newRecord])
+
+    setSelectedCourse(null)
+    setSelectedPitchType(null)
+    setSelectedJudgment(null)
+    setSelectedHitDirection(null)
+    setSelectedHitType(null)
+    setSelectedHitQuality(null)
+  }
+
+  const InPlayForm = () => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-slate-900">打球方向</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {hitDirectionOptions.map((option) => {
+          const isSelected = selectedHitDirection === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSelectedHitDirection(option.value)}
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
+                isSelected
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+              aria-pressed={isSelected}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <h3 className="mt-4 text-sm font-semibold text-slate-900">打球の種類</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {hitTypeOptions.map((option) => {
+          const isSelected = selectedHitType === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSelectedHitType(option.value)}
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
+                isSelected
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+              aria-pressed={isSelected}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <h3 className="mt-4 text-sm font-semibold text-slate-900">打撃の質</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {hitQualityOptions.map((option) => {
+          const isSelected = selectedHitQuality === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSelectedHitQuality(option.value)}
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
+                isSelected
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+              aria-pressed={isSelected}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 
   const recordContent = (
     <section className="space-y-5">
@@ -147,6 +268,14 @@ function App() {
           })}
         </div>
       </div>
+      {selectedJudgment === 'in-play' && <InPlayForm />}
+      <button
+        type="button"
+        onClick={handleRecordPitch}
+        className="w-full rounded-xl border border-indigo-600 bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+      >
+        この1球を記録する
+      </button>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-medium text-slate-700">現在の入力件数</p>
         <p className="mt-2 text-3xl font-bold text-slate-900">{pitchRecords.length}</p>
