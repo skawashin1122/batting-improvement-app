@@ -4,6 +4,9 @@ export interface PitchRecord {
   pitchType: PitchType
   pitchCourse: PitchCourse
   judgment: Judgment
+  hitDirection?: HitDirection
+  hitType?: HitType
+  hitQuality?: HitQuality
 }
 
 export type PitchType = 'straight' | 'slider' | 'curve' | 'fork' | 'changeup'
@@ -28,3 +31,9 @@ export type PitchCourse =
   | 'ball-down-right'
 
 export type Judgment = 'ball' | 'called-strike' | 'swinging-strike' | 'foul' | 'in-play'
+
+export type HitDirection = 'left' | 'center' | 'right'
+
+export type HitType = 'ground-ball' | 'line-drive' | 'fly-ball'
+
+export type HitQuality = 'clean' | 'normal' | 'jammed'
