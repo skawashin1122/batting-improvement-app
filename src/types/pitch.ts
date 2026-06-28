@@ -4,6 +4,7 @@ export interface PitchRecord {
   pitchType: PitchType
   pitchCourse: PitchCourse
   judgment: Judgment
+  plateAppearanceResult?: PlateAppearanceResult
   hitDirection?: HitDirection
   hitType?: HitType
   hitQuality?: HitQuality
@@ -37,3 +38,5 @@ export type HitDirection = 'left' | 'center' | 'right'
 export type HitType = 'ground-ball' | 'line-drive' | 'fly-ball'
 
 export type HitQuality = 'clean' | 'normal' | 'jammed'
+
+export type PlateAppearanceResult = 'single' | 'double' | 'triple' | 'home-run' | 'walk' | 'strikeout' | 'out'
