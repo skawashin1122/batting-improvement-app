@@ -1,5 +1,6 @@
 import { BarChart3, NotebookPen } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import confetti from 'canvas-confetti'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   Judgment,
   PitchCourse,
@@ -10,9 +11,10 @@ import type {
   HitQuality,
   PlateAppearanceResult,
 } from './types/pitch'
-import { calculateBattingStats } from './utils/stats'
+import { calculateBattingStats, calculateCourseHeatmapStats } from './utils/stats'
 
 type TabKey = 'record' | 'analytics'
+type HeatmapMetricKey = 'avg' | 'whiff'
 
 type CourseCell = {
   value: PitchCourse
@@ -163,6 +165,41 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
 
+function formatHeatmapRate(value: number | null): string {
+  if (value === null) {
+    return '--'
+  }
+
+  return formatPercent(value)
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (value < min) {
+    return min
+  }
+  if (value > max) {
+    return max
+  }
+  return value
+}
+
+function getHeatmapCellStyle(metric: HeatmapMetricKey, rate: number | null): { backgroundColor: string; color: string } {
+  if (rate === null) {
+    return {
+      backgroundColor: 'rgba(148, 163, 184, 0.18)',
+      color: '#334155',
+    }
+  }
+
+  const alpha = (0.18 + clamp(rate, 0, 1) * 0.72).toFixed(3)
+  const color = metric === 'avg' ? `rgba(16, 185, 129, ${alpha})` : `rgba(239, 68, 68, ${alpha})`
+
+  return {
+    backgroundColor: color,
+    color: rate >= 0.55 ? '#ffffff' : '#0f172a',
+  }
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('record')
   const [pitchRecords, setPitchRecords] = useState<PitchRecord[]>([])
@@ -173,6 +210,8 @@ function App() {
   const [selectedHitDirection, setSelectedHitDirection] = useState<HitDirection | null>(null)
   const [selectedHitType, setSelectedHitType] = useState<HitType | null>(null)
   const [selectedHitQuality, setSelectedHitQuality] = useState<HitQuality | null>(null)
+  const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetricKey>('avg')
+  const hasTriggeredHotStreakConfetti = useRef(false)
 
   const hitDirectionOptions: Array<{ value: HitDirection; label: string }> = [
     { value: 'left', label: 'レフト' },
@@ -217,6 +256,21 @@ function App() {
   }, [])
 
   const battingStats = useMemo(() => calculateBattingStats(pitchRecords), [pitchRecords])
+  const courseHeatmapStats = useMemo(() => calculateCourseHeatmapStats(pitchRecords), [pitchRecords])
+
+  useEffect(() => {
+    const shouldCelebrate = activeTab === 'analytics' && battingStats.atBats >= 10 && battingStats.ops > 1
+    if (!shouldCelebrate || hasTriggeredHotStreakConfetti.current) {
+      return
+    }
+
+    confetti({
+      particleCount: 140,
+      spread: 90,
+      origin: { y: 0.62 },
+    })
+    hasTriggeredHotStreakConfetti.current = true
+  }, [activeTab, battingStats.atBats, battingStats.ops])
 
   const handleRecordPitch = () => {
     if (!selectedCourse || !selectedPitchType || !selectedJudgment) {
@@ -478,43 +532,99 @@ function App() {
           <p className="text-sm text-slate-700">分析対象データはまだありません。まずは「1球入力」から記録してください。</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">打率 (AVG)</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.avg)}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">出塁率 (OBP)</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.obp)}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">長打率 (SLG)</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.slg)}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">OPS</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.ops)}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">O-Swing%</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{formatPercent(battingStats.oSwingRate)}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">BB/K</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {battingStats.bbPerK === null ? '-' : formatDecimal(battingStats.bbPerK)}
-            </p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">打数 (AB)</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{battingStats.atBats}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">安打 / 四球 / 三振</p>
-            <p className="mt-2 text-xl font-bold text-slate-900">
-              {battingStats.hits} / {battingStats.walks} / {battingStats.strikeouts}
-            </p>
-          </article>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">打率 (AVG)</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.avg)}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">出塁率 (OBP)</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.obp)}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">長打率 (SLG)</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.slg)}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">OPS</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{formatDecimal(battingStats.ops)}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">O-Swing%</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{formatPercent(battingStats.oSwingRate)}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">BB/K</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {battingStats.bbPerK === null ? '-' : formatDecimal(battingStats.bbPerK)}
+              </p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">打数 (AB)</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{battingStats.atBats}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">安打 / 四球 / 三振</p>
+              <p className="mt-2 text-xl font-bold text-slate-900">
+                {battingStats.hits} / {battingStats.walks} / {battingStats.strikeouts}
+              </p>
+            </article>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">コース別ヒートマップ</h3>
+                <p className="mt-1 text-xs text-slate-500">全17コース（ボールゾーン含む）を色分け表示します。</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setHeatmapMetric('avg')}
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                    heatmapMetric === 'avg' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  打率
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHeatmapMetric('whiff')}
+                  className={`ml-1 rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                    heatmapMetric === 'whiff' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  空振り率
+                </button>
+              </div>
+            </div>
+
+            <div className="mx-auto mt-4 grid w-full max-w-xs grid-cols-5 gap-2">
+              {courseGrid.map((cell, index) => {
+                if (!cell) {
+                  return <div key={`heatmap-empty-${index}`} className="h-16" aria-hidden />
+                }
+
+                const metric = courseHeatmapStats[cell.value][heatmapMetric]
+                const style = getHeatmapCellStyle(heatmapMetric, metric.rate)
+
+                return (
+                  <article
+                    key={`heatmap-${cell.value}`}
+                    className="flex h-16 flex-col items-center justify-center rounded-xl border border-white/40 p-1 text-center shadow-sm"
+                    style={style}
+                  >
+                    <p className="text-[10px] font-semibold leading-none">{cell.label}</p>
+                    <p className="mt-1 text-xs font-bold leading-none">{formatHeatmapRate(metric.rate)}</p>
+                    <p className="mt-1 text-[10px] leading-none">
+                      {metric.successes}/{metric.attempts}
+                    </p>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
     </section>
